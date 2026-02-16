@@ -1,5 +1,4 @@
-# SpikeCT-Restorer: Bio-Inspired Low-Dose CT Restoration
-
+# 🧠 SpikeCT-Restorer: Bio-Inspired Low-Dose CT Restoration
 Welcome to the **SpikeCT-Restorer** repository. This project explores the intersection of neuromorphic computing and medical imaging, specifically focusing on the restoration of Low-Dose CT (LDCT) scans.
 
 By leveraging **Spiking Denoising Autoencoders (SDAEs)**, we aim to mimic biological neural efficiency to remove noise from **Sinograms** and reconstructed images, providing high-quality diagnostic visuals with significantly reduced radiation exposure.
