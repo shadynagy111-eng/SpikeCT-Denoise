@@ -76,7 +76,7 @@ python scripts/train_baseline.py --epochs 50 --noise_level 0.1
 
 ## 📝 Contributors
 
-* **Youssef Hammad** - Lead Researcher/Student
+* **Youssef Ahmed** - Lead Researcher/Student
 * **Shady Nagy** - Project Supervisor
 
 ---
