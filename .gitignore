@@ -134,3 +134,5 @@ desktop.ini
 !README.md
 !PROJECT_STATE.md
 !requirements.txt
+
+data/*
