@@ -13,7 +13,8 @@ def calculate_psnr(img1: torch.Tensor, img2: torch.Tensor,
     mse = torch.mean((img1 - img2) ** 2)
     if mse == 0:
         return float('inf')
-    return (10 * torch.log10(torch.tensor(max_val ** 2) / mse)).item()
+    return (10 * torch.log10((max_val ** 2) / mse)).item()
+
 
 
 def calculate_ssim(img1: torch.Tensor, img2: torch.Tensor) -> float:

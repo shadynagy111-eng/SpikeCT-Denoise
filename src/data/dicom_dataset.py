@@ -32,8 +32,16 @@ class PairedCTDataset(Dataset):
         low_dose_dir: str,
         max_slices: Optional[int] = None
     ):
-        self.full_dose_files = sorted(Path(full_dose_dir).glob("*.dcm"))
-        self.low_dose_files  = sorted(Path(low_dose_dir).glob("*.dcm"))
+        full_files = {f.stem: f for f in Path(full_dose_dir).glob("*.dcm")}
+        low_files  = {f.stem: f for f in Path(low_dose_dir).glob("*.dcm")}
+
+        common_keys = sorted(set(full_files.keys()) & set(low_files.keys()))
+
+        assert len(common_keys) > 0, "No matching DICOM pairs found"
+
+        self.full_dose_files = [full_files[k] for k in common_keys]
+        self.low_dose_files  = [low_files[k]  for k in common_keys]
+
 
         # Validate pairing
         assert len(self.full_dose_files) == len(self.low_dose_files), \

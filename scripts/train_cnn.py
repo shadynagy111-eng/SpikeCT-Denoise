@@ -3,14 +3,40 @@ Training Script — CNN Baseline (CDAE)
 Run from project root: python scripts/train_cnn.py
 """
 
+import os
 import sys
 import json
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+# ──────────────────────────────────────────────────────────────────────
+# Reproducibility
+# ──────────────────────────────────────────────────────────────────────
+SEED = 42
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seed(SEED)
+
+def seed_worker(worker_id):
+    worker_seed = SEED + worker_id
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+# ──────────────────────────────────────────────────────────────────────
 
 sys.path.append('src')
 from data.dicom_dataset import PairedCTDataset
@@ -40,7 +66,7 @@ class Trainer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Device: {self.device}")
 
-        self.model     = CDAE(in_channels=1).to(self.device)
+        self.model = CDAE(in_channels=1).to(self.device)
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(
             self.model.parameters(),
@@ -52,8 +78,10 @@ class Trainer:
         )
 
         self.history = {
-            'train_loss': [], 'val_loss': [],
-            'val_psnr':   [], 'val_ssim': []
+            'train_loss': [],
+            'val_loss': [],
+            'val_psnr': [],
+            'val_ssim': []
         }
 
         print(f"Model parameters: {self.model.get_num_params():,}")
@@ -64,23 +92,28 @@ class Trainer:
 
         for low, full in tqdm(loader, desc='  Train'):
             low, full = low.to(self.device), full.to(self.device)
+
             self.optimizer.zero_grad()
             output = self.model(low)
-            loss   = self.criterion(output, full)
+            loss = self.criterion(output, full)
             loss.backward()
             self.optimizer.step()
+
             total_loss += loss.item()
 
         return total_loss / len(loader)
 
     def validate(self, loader):
         self.model.eval()
-        total_loss = total_psnr = total_ssim = 0.0
+        total_loss = 0.0
+        total_psnr = 0.0
+        total_ssim = 0.0
 
         with torch.no_grad():
             for low, full in tqdm(loader, desc='  Val  '):
-                low, full  = low.to(self.device), full.to(self.device)
-                output     = self.model(low)
+                low, full = low.to(self.device), full.to(self.device)
+                output = self.model(low)
+
                 total_loss += self.criterion(output, full).item()
                 total_psnr += batch_psnr(output, full)
                 total_ssim += batch_ssim(output, full)
@@ -93,8 +126,8 @@ class Trainer:
         }
 
     def train(self, train_loader, val_loader):
-        best_psnr    = 0.0
-        no_improve   = 0
+        best_psnr = 0.0
+        no_improve = 0
 
         for epoch in range(self.config['num_epochs']):
             print(f"\n{'='*55}")
@@ -102,7 +135,7 @@ class Trainer:
             print(f"{'='*55}")
 
             train_loss = self.train_epoch(train_loader)
-            val        = self.validate(val_loader)
+            val = self.validate(val_loader)
 
             self.history['train_loss'].append(train_loss)
             self.history['val_loss'].append(val['loss'])
@@ -117,9 +150,10 @@ class Trainer:
             self.scheduler.step(val['psnr'])
 
             if val['psnr'] > best_psnr:
-                best_psnr  = val['psnr']
+                best_psnr = val['psnr']
                 no_improve = 0
-                self._save('best_model.pth', epoch, val)
+                os.makedirs('results/checkpoints', exist_ok=True)
+                self._save('results/checkpoints/cnn_best.pth', epoch, val)
                 print(f"  ✓ Best model saved — PSNR: {best_psnr:.2f} dB")
             else:
                 no_improve += 1
@@ -131,69 +165,77 @@ class Trainer:
 
     def _save(self, path, epoch, metrics):
         torch.save({
-            'epoch':                epoch,
-            'model_state_dict':     self.model.state_dict(),
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'metrics':              metrics,
-            'config':               self.config,
-            'history':              self.history
+            'metrics': metrics,
+            'config': self.config,
+            'history': self.history,
+            'seed': SEED
         }, path)
 
     def plot_history(self, path='results/training_history.png'):
-        import os; os.makedirs('results', exist_ok=True)
+        os.makedirs('results', exist_ok=True)
 
         fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
         axes[0].plot(self.history['train_loss'], label='Train')
-        axes[0].plot(self.history['val_loss'],   label='Val')
-        axes[0].set_title('Loss');  axes[0].set_xlabel('Epoch')
-        axes[0].legend(); axes[0].grid(True)
+        axes[0].plot(self.history['val_loss'], label='Val')
+        axes[0].set_title('Loss')
+        axes[0].legend()
+        axes[0].grid(True)
 
-        axes[1].plot(self.history['val_psnr'], color='green')
-        axes[1].set_title('Val PSNR (dB)'); axes[1].set_xlabel('Epoch')
+        axes[1].plot(self.history['val_psnr'])
+        axes[1].set_title('Val PSNR (dB)')
         axes[1].grid(True)
 
-        axes[2].plot(self.history['val_ssim'], color='orange')
-        axes[2].set_title('Val SSIM'); axes[2].set_xlabel('Epoch')
+        axes[2].plot(self.history['val_ssim'])
+        axes[2].set_title('Val SSIM')
         axes[2].grid(True)
 
         plt.tight_layout()
-        plt.savefig(path, dpi=150, bbox_inches='tight')
+        plt.savefig(path, dpi=150)
         print(f"Saved {path}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────
 def main():
-    # Dataset
     full_dataset = PairedCTDataset(
         full_dose_dir=CONFIG['full_dose_dir'],
         low_dose_dir=CONFIG['low_dose_dir']
     )
 
-    val_size   = int(CONFIG['val_split'] * len(full_dataset))
-    train_size = len(full_dataset) - val_size
-    indices    = list(range(len(full_dataset)))
-    split_idx  = int(0.8 * len(full_dataset))
-    train_ds   = torch.utils.data.Subset(full_dataset, indices[:split_idx])
-    val_ds     = torch.utils.data.Subset(full_dataset, indices[split_idx:])
+    split_idx = int((1 - CONFIG['val_split']) * len(full_dataset))
+    indices = list(range(len(full_dataset)))
 
-    print(f"Train: {len(train_ds)}  |  Val: {len(val_ds)}")
+    train_ds = Subset(full_dataset, indices[:split_idx])
+    val_ds   = Subset(full_dataset, indices[split_idx:])
+
+    print(f"Train: {len(train_ds)} | Val: {len(val_ds)}")
 
     train_loader = DataLoader(
-        train_ds, batch_size=CONFIG['batch_size'],
-        shuffle=True,  num_workers=CONFIG['num_workers'], pin_memory=True
-    )
-    val_loader = DataLoader(
-        val_ds,   batch_size=CONFIG['batch_size'],
-        shuffle=False, num_workers=CONFIG['num_workers'], pin_memory=True
+        train_ds,
+        batch_size=CONFIG['batch_size'],
+        shuffle=True,
+        num_workers=CONFIG['num_workers'],
+        pin_memory=True,
+        worker_init_fn=seed_worker
     )
 
-    # Train
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=CONFIG['batch_size'],
+        shuffle=False,
+        num_workers=CONFIG['num_workers'],
+        pin_memory=True,
+        worker_init_fn=seed_worker
+    )
+
     trainer = Trainer(CONFIG)
     trainer.train(train_loader, val_loader)
     trainer.plot_history()
 
-    # Save config
+    os.makedirs('results', exist_ok=True)
     with open('results/config.json', 'w') as f:
         json.dump(CONFIG, f, indent=2)
 
