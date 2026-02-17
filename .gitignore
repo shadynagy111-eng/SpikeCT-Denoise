@@ -1,0 +1,136 @@
+############################################
+# ========== Python / Environment ==========
+############################################
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Pip / poetry / conda
+pip-log.txt
+pip-delete-this-directory.txt
+poetry.lock
+Pipfile.lock
+.conda/
+
+############################################
+# ========== Jupyter =======================
+############################################
+
+.ipynb_checkpoints/
+
+############################################
+# ========== Dataset =======================
+############################################
+
+# Raw and processed data
+data/raw/
+data/processed/
+
+# Any large medical files
+*.nii
+*.nii.gz
+*.mhd
+*.raw
+*.dcm
+*.h5
+*.npz
+
+############################################
+# ========== Experiments ===================
+############################################
+
+# Experiment folders
+experiments/
+results/
+
+# Logs
+*.log
+logs/
+
+# TensorBoard
+runs/
+events.out.tfevents*
+
+############################################
+# ========== Model Checkpoints =============
+############################################
+
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+############################################
+# ========== Plots / Generated Artifacts ===
+############################################
+
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+
+############################################
+# ========== OS Specific ===================
+############################################
+
+# Ubuntu / Linux
+*~
+.Trash-*
+.nfs*
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+############################################
+# ========== IDE ===========================
+############################################
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+############################################
+# ========== Misc ==========================
+############################################
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache
+.cache/
+
+############################################
+# ========== KEEP THESE ====================
+############################################
+
+# Explicitly keep project structure
+!data/README.md
+!README.md
+!PROJECT_STATE.md
+!requirements.txt
