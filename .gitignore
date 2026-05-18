@@ -41,6 +41,7 @@ Pipfile.lock
 ############################################
 
 # Raw and processed data
+data/
 data/raw/
 data/processed/
 
@@ -60,6 +61,7 @@ data/processed/
 # Experiment folders
 experiments/
 results/
+figures/
 
 # Logs
 *.log
@@ -73,6 +75,7 @@ events.out.tfevents*
 # ========== Model Checkpoints =============
 ############################################
 
+checkpoints/
 *.pth
 *.pt
 *.ckpt
@@ -134,9 +137,3 @@ desktop.ini
 !README.md
 !PROJECT_STATE.md
 !requirements.txt
-
-data/*venv/
-data/
-checkpoints/
-logs/
-__pycache__/
