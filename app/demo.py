@@ -273,126 +273,35 @@ def run_inference(model, model_name, img_np):
     return pred_np, elapsed_ms
 
 # ─────────────────────────────────────────────────────────────
-# Figure generation
+# Gallery generation
 # ─────────────────────────────────────────────────────────────
 
-def make_figure(
+def make_gallery_items(
     input_img,
     predictions,
     reference=None
 ):
+    """
+    Returns a list of (image, label) tuples for gr.Gallery.
+    """
+    items = []
 
-    has_ref = reference is not None
-
-    n_cols = (
-        1 +
-        len(predictions) +
-        (1 if has_ref else 0)
-    )
-
-    fig, axes = plt.subplots(
-        1,
-        n_cols,
-        figsize=(5 * n_cols, 5)
-    )
-
-    if n_cols == 1:
-        axes = [axes]
-
-    col = 0
+    # Helper to convert grayscale float32 [0,1] to uint8 [0,255]
+    def to_uint8(img):
+        return (np.clip(img, 0, 1) * 255).astype(np.uint8)
 
     # Input
-    axes[col].imshow(
-        input_img,
-        cmap="gray",
-        vmin=0,
-        vmax=1
-    )
-
-    axes[col].set_title(
-        "Low-Dose Input"
-    )
-
-    axes[col].axis("off")
-
-    col += 1
+    items.append((to_uint8(input_img), "Low-Dose Input"))
 
     # Predictions
     for name, pred, elapsed in predictions:
-
-        ax = axes[col]
-
-        ax.imshow(
-            pred,
-            cmap="gray",
-            vmin=0,
-            vmax=1
-        )
-
-        ax.set_title(name)
-
-        ax.axis("off")
-
-        if has_ref:
-
-            p = psnr_fn(
-                reference,
-                pred,
-                data_range=1.0
-            )
-
-            s = ssim_fn(
-                reference,
-                pred,
-                data_range=1.0
-            )
-
-            txt = (
-                f"PSNR: {p:.2f} dB\n"
-                f"SSIM: {s:.3f}\n"
-                f"{elapsed:.0f} ms"
-            )
-
-        else:
-
-            txt = f"{elapsed:.0f} ms"
-
-        ax.text(
-            0.02,
-            0.02,
-            txt,
-            transform=ax.transAxes,
-            color="white",
-            fontsize=9,
-            verticalalignment="bottom",
-            bbox=dict(
-                boxstyle="round",
-                facecolor="black",
-                alpha=0.7
-            )
-        )
-
-        col += 1
+        items.append((to_uint8(pred), f"{name} ({elapsed:.0f}ms)"))
 
     # Reference
-    if has_ref:
+    if reference is not None:
+        items.append((to_uint8(reference), "Full-Dose Reference"))
 
-        axes[col].imshow(
-            reference,
-            cmap="gray",
-            vmin=0,
-            vmax=1
-        )
-
-        axes[col].set_title(
-            "Full-Dose Reference"
-        )
-
-        axes[col].axis("off")
-
-    plt.tight_layout()
-
-    return fig
+    return items
 
 # ─────────────────────────────────────────────────────────────
 # Metrics text
@@ -407,12 +316,14 @@ def make_metrics_text(
     if reference is None:
 
         lines = [
-            "No reference image provided.\n"
+            "### Evaluation Summary (No Reference Provided)\n",
+            "> **Note:** Without a reference image, PSNR and SSIM gains cannot be calculated. ",
+            "The model output is purely based on the low-dose input.\n"
         ]
 
         for name, _, elapsed in predictions:
             lines.append(
-                f"- {name}: {elapsed:.1f} ms"
+                f"- **{name}**: {elapsed:.1f} ms"
             )
 
         return "\n".join(lines)
@@ -424,7 +335,8 @@ def make_metrics_text(
     )
 
     lines = [
-        f"Input PSNR: {p_in:.2f} dB",
+        f"### Evaluation Summary",
+        f"**Input PSNR:** {p_in:.2f} dB",
         ""
     ]
 
@@ -445,11 +357,10 @@ def make_metrics_text(
         gain = p - p_in
 
         lines.extend([
-            f"{name}",
-            f"  PSNR: {p:.4f} dB",
-            f"  Gain: {gain:+.2f} dB",
-            f"  SSIM: {s:.4f}",
-            f"  Time: {elapsed:.1f} ms",
+            f"#### {name}",
+            f"- **PSNR:** {p:.4f} dB ({gain:+.2f} dB gain)",
+            f"- **SSIM:** {s:.4f}",
+            f"- **Time:** {elapsed:.1f} ms",
             ""
         ])
 
@@ -532,7 +443,7 @@ def denoise(
     if len(predictions) == 0:
         return None, "No models ran."
 
-    fig = make_figure(
+    gallery = make_gallery_items(
         arr,
         predictions,
         reference
@@ -544,7 +455,7 @@ def denoise(
         arr
     )
 
-    return fig, metrics
+    return gallery, metrics
 
 # ─────────────────────────────────────────────────────────────
 # Gradio UI
@@ -553,47 +464,74 @@ def denoise(
 MODEL_CHOICES = list(MODELS.keys())
 
 with gr.Blocks(
-    title="SpikeCT-Denoise"
+    title="SpikeCT-Denoise",
+    theme=gr.themes.Soft()
 ) as demo:
 
     gr.Markdown(
         "# SpikeCT-Denoise\n"
-        "Low-Dose CT Restoration — "
-        "CNN vs Spiking Neural Networks"
+        "Low-Dose CT Restoration — CNN vs Spiking Neural Networks"
     )
 
     with gr.Row():
 
         with gr.Column(scale=1):
 
-            input_file = gr.File(
-                label="Low-dose input (.npy)",
-                file_types=[".npy"]
-            )
+            with gr.Group():
+                gr.Markdown("### 1. Upload Data")
+                input_file = gr.File(
+                    label="Low-dose input (.npy)",
+                    file_types=[".npy"]
+                )
 
-            reference_file = gr.File(
-                label="Full-dose reference (.npy)",
-                file_types=[".npy"]
-            )
+                reference_file = gr.File(
+                    label="Full-dose reference (.npy)",
+                    file_types=[".npy"],
+                )
+                gr.Markdown(
+                    "*The reference is **optional**. If provided, it is only used to calculate "
+                    "quality metrics (PSNR/SSIM) and compare results. It does not affect the model output.*"
+                )
 
-            model_selector = gr.CheckboxGroup(
-                choices=MODEL_CHOICES,
-                value=MODEL_CHOICES,
-                label="Models"
-            )
+            with gr.Group():
+                gr.Markdown("### 2. Select Models")
+                model_selector = gr.CheckboxGroup(
+                    choices=MODEL_CHOICES,
+                    value=MODEL_CHOICES,
+                    label="Active Models"
+                )
 
             run_btn = gr.Button(
-                "Run Denoising",
+                "🚀 Run Denoising",
                 variant="primary"
             )
 
-        with gr.Column(scale=3):
-
-            output_plot = gr.Plot(
-                label="Denoising Comparison"
+        with gr.Column(scale=2):
+            
+            output_gallery = gr.Gallery(
+                label="Denoising Results",
+                show_label=True,
+                elem_id="gallery",
+                columns=[2],
+                rows=[2],
+                object_fit="contain",
+                height="auto"
             )
 
             output_metrics = gr.Markdown()
+
+    with gr.Accordion("Technical Details & Metric Explanations", open=False):
+        gr.Markdown(
+            "### How it works\n"
+            "- **Training:** These models were trained using pairs of Low-Dose and Full-Dose images. "
+            "The Full-Dose image acted as the 'Ground Truth'.\n"
+            "- **Inference (Demo):** The model only sees the Low-Dose input. It uses its learned weights "
+            "to predict the clean image.\n"
+            "- **PSNR (Peak Signal-to-Noise Ratio):** Measures the ratio between the maximum possible power "
+            "of a signal and the power of corrupting noise. Higher is better.\n"
+            "- **SSIM (Structural Similarity Index):** Measures the similarity between two images based on "
+            "luminance, contrast, and structure. Ranges from 0 to 1; higher is better."
+        )
 
     run_btn.click(
         fn=denoise,
@@ -603,7 +541,7 @@ with gr.Blocks(
             model_selector
         ],
         outputs=[
-            output_plot,
+            output_gallery,
             output_metrics
         ]
     )

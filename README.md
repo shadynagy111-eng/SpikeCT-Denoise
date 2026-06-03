@@ -39,8 +39,9 @@ The repository is organized into two primary phases:
 ### Prerequisites
 
 * Python 3.9+
-* PyTorch or TensorFlow
+* PyTorch
 * `SpikingJelly` (for SNN implementation)
+* Gradio (for the interactive demo)
 * NumPy, Matplotlib, and Scikit-Image
 
 ### Installation
@@ -49,8 +50,28 @@ The repository is organized into two primary phases:
 git clone https://github.com/[username]/SpikeCT-Restorer.git
 cd SpikeCT-Restorer
 pip install -r requirements.txt
-
 ```
+
+### 🎨 Interactive Demo
+
+Experience the denoising performance first-hand using our Gradio-based web interface. The demo allows you to compare the CNN baseline against various Spiking Neural Network architectures.
+
+#### Running the Demo
+```bash
+python app/demo.py
+```
+This will launch a local server (usually at `http://localhost:7860`) and provide a public sharing link.
+
+#### Features
+*   **Multi-Model Comparison:** Run CNN-Final, SNN-Direct-IF, SNN-Direct-LIF, and SNN-IF Latency models side-by-side.
+*   **Interactive Gallery:** Click on results to zoom in and download denoised images.
+*   **Quality Metrics:** Upload an optional Full-Dose reference to automatically calculate **PSNR** gain and **SSIM**.
+*   **Real-time Latency:** Compare the inference speed of spiking models vs. traditional CNNs.
+
+#### Sample Data
+You can find demo slices in `app/demo_slices/`. Use the `low_*.npy` files as input and the corresponding `full_*.npy` files as the reference.
+
+---
 
 ### Usage (Baseline Autoencoder)
 
